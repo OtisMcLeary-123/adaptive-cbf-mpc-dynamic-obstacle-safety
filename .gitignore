@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# Generated experiment outputs
+results/**/*.csv
+results/**/*.json
+results/**/*.png
+results/**/*.pdf
+!results/.gitkeep
+
+# Local paper corpus
+papers/*.pdf
+papers/*.txt
+
+# Local environment
+.env
+.DS_Store
