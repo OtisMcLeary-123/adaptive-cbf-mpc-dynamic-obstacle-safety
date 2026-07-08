@@ -8,10 +8,10 @@ Block B evaluates non-LLM adaptive CBF baselines on the same dynamic obstacle po
 
 | Method | Runs | Success | Collision | Clearance | Solve time |
 |---|---:|---:|---:|---:|---:|
-| Fixed CBF gamma=0.15 | 50 | 0.880 | 0.000 | 0.491 | 1.830 |
-| Fixed CBF gamma=0.08 | 50 | 0.860 | 0.000 | 0.823 | 1.824 |
+| Fixed CBF gamma=0.15 | 50 | 0.880 | 0.000 | 0.491 | 1.838 |
+| Fixed CBF gamma=0.08 | 50 | 0.860 | 0.000 | 0.823 | 1.832 |
 | Fixed CBF gamma=0.04 | 50 | 0.860 | 0.000 | 1.033 | 1.827 |
-| Rule adaptive CBF | 50 | 0.800 | 0.000 | 0.853 | 1.831 |
+| Rule adaptive CBF | 50 | 0.800 | 0.000 | 0.853 | 1.822 |
 
 The paired-delta table reports matched-seed changes from each fixed gamma baseline to the rule-adaptive CBF controller.
 

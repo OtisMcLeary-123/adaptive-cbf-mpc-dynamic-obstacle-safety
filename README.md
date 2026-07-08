@@ -171,18 +171,18 @@ docs/paper_section_results.md
 
 | Method | Success | Collision | Infeasible | Clearance | Path | Time | Solve |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| CBF static obstacle in horizon | 0.880 | 0.000 | 0.073 | 0.506 m | 5.703 m | 5.97 s | 1.830 ms |
-| CBF stale sensing delay=3 | 0.800 | 0.000 | 0.033 | 0.775 m | 5.985 m | 6.29 s | 1.832 ms |
-| CBF velocity prediction | 0.860 | 0.000 | 0.026 | 0.823 m | 5.970 m | 6.05 s | 1.828 ms |
+| CBF static obstacle in horizon | 0.880 | 0.000 | 0.073 | 0.506 m | 5.703 m | 5.97 s | 1.834 ms |
+| CBF stale sensing delay=3 | 0.800 | 0.000 | 0.033 | 0.775 m | 5.985 m | 6.29 s | 1.845 ms |
+| CBF velocity prediction | 0.860 | 0.000 | 0.026 | 0.823 m | 5.970 m | 6.05 s | 1.826 ms |
 
 ### E6: Fixed Gamma vs Rule-Adaptive CBF, 50 Seeds
 
 | Method | Success | Collision | Infeasible | Clearance | Path | Time | Solve |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| Fixed CBF gamma=0.15 | 0.880 | 0.000 | 0.016 | 0.491 m | 5.600 m | 5.72 s | 1.830 ms |
-| Fixed CBF gamma=0.08 | 0.860 | 0.000 | 0.026 | 0.823 m | 5.970 m | 6.05 s | 1.824 ms |
+| Fixed CBF gamma=0.15 | 0.880 | 0.000 | 0.016 | 0.491 m | 5.600 m | 5.72 s | 1.838 ms |
+| Fixed CBF gamma=0.08 | 0.860 | 0.000 | 0.026 | 0.823 m | 5.970 m | 6.05 s | 1.832 ms |
 | Fixed CBF gamma=0.04 | 0.860 | 0.000 | 0.315 | 1.033 m | 6.394 m | 6.66 s | 1.827 ms |
-| Rule adaptive CBF | 0.800 | 0.000 | 0.040 | 0.853 m | 6.140 m | 6.66 s | 1.831 ms |
+| Rule adaptive CBF | 0.800 | 0.000 | 0.040 | 0.853 m | 6.140 m | 6.66 s | 1.822 ms |
 
 Current interpretation:
 
@@ -195,14 +195,30 @@ Current interpretation:
 
 | Scenario | Method | Seeds | Success | Collision | Clearance | Path | Time | Solve |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
-| aggressive_crossing_v1 | Fixed CBF gamma=0.15 | 50 | 1.00 | 0.00 | 0.309 | 5.467 | 4.37 | 1.319 |
-| aggressive_crossing_v1 | Fixed CBF gamma=0.08 | 50 | 1.00 | 0.00 | 0.416 | 5.747 | 4.56 | 1.319 |
-| aggressive_crossing_v1 | Fixed CBF gamma=0.04 | 50 | 1.00 | 0.00 | 0.483 | 5.803 | 4.61 | 1.318 |
-| aggressive_crossing_v1 | Rule adaptive CBF | 50 | 1.00 | 0.00 | 0.475 | 5.815 | 4.61 | 1.322 |
-| point_mass_2d_dynamic_obstacle_v1 | Fixed CBF gamma=0.15 | 50 | 0.88 | 0.00 | 0.491 | 5.600 | 5.72 | 1.806 |
-| point_mass_2d_dynamic_obstacle_v1 | Fixed CBF gamma=0.08 | 50 | 0.86 | 0.00 | 0.823 | 5.970 | 6.05 | 1.820 |
-| point_mass_2d_dynamic_obstacle_v1 | Fixed CBF gamma=0.04 | 50 | 0.86 | 0.00 | 1.033 | 6.394 | 6.66 | 1.830 |
-| point_mass_2d_dynamic_obstacle_v1 | Rule adaptive CBF | 50 | 0.80 | 0.00 | 0.853 | 6.140 | 6.66 | 1.826 |
+| aggressive_crossing_v1 | Fixed CBF gamma=0.15 | 50 | 1.00 | 0.00 | 0.309 | 5.467 | 4.37 | 1.326 |
+| aggressive_crossing_v1 | Fixed CBF gamma=0.08 | 50 | 1.00 | 0.00 | 0.416 | 5.747 | 4.56 | 1.324 |
+| aggressive_crossing_v1 | Fixed CBF gamma=0.04 | 50 | 1.00 | 0.00 | 0.483 | 5.803 | 4.61 | 1.324 |
+| aggressive_crossing_v1 | Rule adaptive CBF | 50 | 1.00 | 0.00 | 0.475 | 5.815 | 4.61 | 1.328 |
+| fast_crossing_v1 | Fixed CBF gamma=0.15 | 50 | 1.00 | 0.00 | 0.266 | 5.634 | 4.48 | 1.316 |
+| fast_crossing_v1 | Fixed CBF gamma=0.08 | 50 | 1.00 | 0.00 | 0.324 | 5.759 | 4.60 | 1.321 |
+| fast_crossing_v1 | Fixed CBF gamma=0.04 | 50 | 1.00 | 0.00 | 0.360 | 5.812 | 4.64 | 1.318 |
+| fast_crossing_v1 | Rule adaptive CBF | 50 | 1.00 | 0.00 | 0.353 | 5.809 | 4.63 | 1.323 |
+| head_on_v1 | Fixed CBF gamma=0.15 | 50 | 1.00 | 0.00 | 0.571 | 5.385 | 4.38 | 1.463 |
+| head_on_v1 | Fixed CBF gamma=0.08 | 50 | 1.00 | 0.00 | 0.959 | 5.822 | 4.61 | 1.461 |
+| head_on_v1 | Fixed CBF gamma=0.04 | 50 | 1.00 | 0.00 | 1.125 | 5.933 | 4.70 | 1.458 |
+| head_on_v1 | Rule adaptive CBF | 50 | 1.00 | 0.00 | 1.020 | 5.874 | 4.66 | 1.452 |
+| late_crossing_v1 | Fixed CBF gamma=0.15 | 50 | 1.00 | 0.00 | 0.365 | 5.191 | 4.20 | 1.139 |
+| late_crossing_v1 | Fixed CBF gamma=0.08 | 50 | 1.00 | 0.00 | 0.739 | 5.802 | 4.61 | 1.147 |
+| late_crossing_v1 | Fixed CBF gamma=0.04 | 50 | 1.00 | 0.00 | 0.994 | 6.239 | 4.90 | 1.147 |
+| late_crossing_v1 | Rule adaptive CBF | 50 | 1.00 | 0.00 | 0.798 | 5.857 | 4.65 | 1.152 |
+| noisy_prediction_v1 | Fixed CBF gamma=0.15 | 50 | 1.00 | 0.00 | 0.438 | 5.234 | 4.32 | 1.492 |
+| noisy_prediction_v1 | Fixed CBF gamma=0.08 | 50 | 1.00 | 0.00 | 0.742 | 5.620 | 4.68 | 1.488 |
+| noisy_prediction_v1 | Fixed CBF gamma=0.04 | 50 | 1.00 | 0.00 | 0.961 | 5.866 | 4.93 | 1.491 |
+| noisy_prediction_v1 | Rule adaptive CBF | 50 | 1.00 | 0.00 | 0.787 | 5.658 | 4.73 | 1.478 |
+| point_mass_2d_dynamic_obstacle_v1 | Fixed CBF gamma=0.15 | 50 | 0.88 | 0.00 | 0.491 | 5.600 | 5.72 | 1.838 |
+| point_mass_2d_dynamic_obstacle_v1 | Fixed CBF gamma=0.08 | 50 | 0.86 | 0.00 | 0.823 | 5.970 | 6.05 | 1.842 |
+| point_mass_2d_dynamic_obstacle_v1 | Fixed CBF gamma=0.04 | 50 | 0.86 | 0.00 | 1.033 | 6.394 | 6.66 | 1.828 |
+| point_mass_2d_dynamic_obstacle_v1 | Rule adaptive CBF | 50 | 0.80 | 0.00 | 0.853 | 6.140 | 6.66 | 1.836 |
 
 ### E6 Paired Deltas
 
@@ -210,9 +226,9 @@ Deltas are matched by seed and computed as `Rule adaptive CBF - fixed baseline` 
 
 | Baseline | Seeds | Delta success | Delta collision | Delta clearance | Delta path length | Delta solve time |
 |---|---:|---:|---:|---:|---:|---:|
-| Fixed CBF gamma=0.15 | 50 | -0.080 +- 0.146 | 0.000 +- 0.000 | 0.362 +- 0.016 | 0.540 +- 0.289 | 0.001 +- 0.006 |
-| Fixed CBF gamma=0.08 | 50 | -0.060 +- 0.118 | 0.000 +- 0.000 | 0.030 +- 0.010 | 0.170 +- 0.223 | 0.006 +- 0.008 |
-| Fixed CBF gamma=0.04 | 50 | -0.060 +- 0.142 | 0.000 +- 0.000 | -0.181 +- 0.014 | -0.253 +- 0.245 | 0.004 +- 0.007 |
+| Fixed CBF gamma=0.15 | 50 | -0.080 +- 0.146 | 0.000 +- 0.000 | 0.362 +- 0.016 | 0.540 +- 0.289 | -0.016 +- 0.010 |
+| Fixed CBF gamma=0.08 | 50 | -0.060 +- 0.118 | 0.000 +- 0.000 | 0.030 +- 0.010 | 0.170 +- 0.223 | -0.009 +- 0.008 |
+| Fixed CBF gamma=0.04 | 50 | -0.060 +- 0.142 | 0.000 +- 0.000 | -0.181 +- 0.014 | -0.253 +- 0.245 | -0.005 +- 0.008 |
 
 ### Backend Comparison
 
@@ -284,6 +300,6 @@ Block B is ready for GitHub/public baseline use when:
 
 ## Next Implementation Steps
 
-1. Add additional stress scenarios if the paper needs explicit collision-rate separation, not only infeasible/safety-margin separation.
+1. Tune the hard scenarios further if the paper needs explicit collision-rate separation, not only infeasible/safety-margin separation.
 2. Use E6 as the strong non-LLM comparator for Block C language interfaces.
 3. Keep the artifact schema stable so LaMPC/LLM blocks can consume Block B outputs directly.

@@ -85,7 +85,7 @@ def write_summary_tables(rows: list[dict[str, Any]]) -> None:
     out.mkdir(parents=True, exist_ok=True)
     fieldnames = ["suite", "experiment_id", "scenario_id", "backend", "label", *METRICS, "summary_path"]
     with (out / "summary_metrics.csv").open("w", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer = csv.DictWriter(handle, fieldnames=fieldnames, lineterminator="\n")
         writer.writeheader()
         for row in rows:
             agg = row["aggregate"]
@@ -138,7 +138,7 @@ def write_scenario_table(rows: list[dict[str, Any]]) -> None:
     ]
     with (out / "scenario_comparison.csv").open("w", newline="") as handle:
         fieldnames = ["scenario_id", "method", "seeds", "success", "collision", "clearance", "path_length", "completion_time", "solve_time"]
-        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer = csv.DictWriter(handle, fieldnames=fieldnames, lineterminator="\n")
         writer.writeheader()
         for row in table_rows:
             agg = row["aggregate"]
@@ -239,7 +239,7 @@ def write_paired_delta_table() -> None:
         "summary_path",
     ]
     with (out / "paired_delta.csv").open("w", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer = csv.DictWriter(handle, fieldnames=fieldnames, lineterminator="\n")
         writer.writeheader()
         writer.writerows(table_rows)
 

@@ -12,6 +12,10 @@ The experiments must use the same point-mass scenario family as Block A so later
 E5 -> E6
 ```
 
+## Scenario Set
+
+The E6 scenario suite includes the base dynamic obstacle task plus `aggressive_crossing_v1`, `fast_crossing_v1`, `late_crossing_v1`, `head_on_v1`, and `noisy_prediction_v1`.
+
 ## Required Outputs
 
 Each experiment writes the standardized output layout:
