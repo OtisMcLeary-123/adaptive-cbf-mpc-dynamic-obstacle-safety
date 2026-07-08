@@ -18,6 +18,8 @@ def main() -> None:
     parser.add_argument("--seeds", type=int, default=10)
     parser.add_argument("--gamma", type=float, default=0.08)
     parser.add_argument("--sensor-delay-steps", type=int, default=3)
+    parser.add_argument("--backend", choices=["random_shooting", "casadi"], default="random_shooting")
+    parser.add_argument("--casadi-horizon", type=int, default=8)
     args = parser.parse_args()
     run_e5_prediction_comparison(
         args.scenario,
@@ -25,6 +27,8 @@ def main() -> None:
         seeds=args.seeds,
         gamma=args.gamma,
         sensor_delay_steps=args.sensor_delay_steps,
+        backend=args.backend,
+        casadi_horizon=args.casadi_horizon,
     )
     print(f"Wrote E5 results to {args.output}")
 

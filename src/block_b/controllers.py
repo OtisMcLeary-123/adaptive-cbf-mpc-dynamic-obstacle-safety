@@ -8,6 +8,11 @@ import numpy as np
 from .dynamics import clip_norm, nominal_pd_control, step_state
 from .scenario import Scenario, obstacle_position
 
+try:
+    import casadi as ca
+except ImportError:  # pragma: no cover - optional dependency.
+    ca = None
+
 
 @dataclass(frozen=True)
 class ControlResult:
@@ -16,6 +21,10 @@ class ControlResult:
     solver_success: bool
     predicted_violation: float
     gamma_used: float | None
+    backend: str = "random_shooting"
+    infeasible: bool = False
+    fallback_used: bool = False
+    solver_status: str = "ok"
 
 
 class SamplingMPCController:
@@ -58,6 +67,7 @@ class SamplingMPCController:
                 solver_success=True,
                 predicted_violation=0.0,
                 gamma_used=None,
+                solver_status="not_applicable",
             )
         gamma_used = self._effective_gamma(state, step)
         controls = self._candidate_sequences(state, step)
@@ -67,9 +77,12 @@ class SamplingMPCController:
         return ControlResult(
             control=controls[best_idx, 0],
             solve_time_ms=solve_time_ms,
-            solver_success=bool(violation[best_idx] <= 1e-7),
+            solver_success=True,
             predicted_violation=float(violation[best_idx]),
             gamma_used=gamma_used,
+            infeasible=bool(violation[best_idx] > 1e-7),
+            fallback_used=False,
+            solver_status="feasible_candidate" if violation[best_idx] <= 1e-7 else "best_candidate_infeasible",
         )
 
     def _candidate_sequences(self, state: np.ndarray, step: int) -> np.ndarray:
@@ -153,6 +166,176 @@ class SamplingMPCController:
         if self.method == "cbf":
             return 0.15 if self.gamma is None else float(self.gamma)
         return self.gamma
+
+    def _rule_based_gamma(self, state: np.ndarray, step: int) -> float:
+        pos = state[:2]
+        vel = state[2:]
+        obs = obstacle_position(self.scenario, step)
+        rel = obs - pos
+        distance = float(np.linalg.norm(rel))
+        clearance = distance - self.safe_radius
+        if distance < 1e-9:
+            return 0.02
+
+        rel_velocity = self.scenario.obstacle.velocity - vel
+        closing_speed = -float(np.dot(rel_velocity, rel / distance))
+        ttc = clearance / max(closing_speed, 1e-6) if closing_speed > 0.0 else np.inf
+
+        if clearance < 0.35 or ttc < 1.0:
+            return 0.02
+        if clearance < 0.75 or ttc < 2.0:
+            return 0.04
+        return 0.08
+
+    def _predicted_obstacle_position(self, current_step: int, horizon_offset: int) -> np.ndarray:
+        if self.prediction_mode == "true_velocity":
+            return obstacle_position(self.scenario, current_step + horizon_offset)
+
+        sensed_step = max(0, current_step - self.sensor_delay_steps)
+        sensed_position = obstacle_position(self.scenario, sensed_step)
+        if self.prediction_mode == "static":
+            return sensed_position
+        return sensed_position + horizon_offset * self.scenario.simulation.dt * self.scenario.obstacle.velocity
+
+
+class CasadiMPCController:
+    """CasADi/IPOPT CBF-MPC backend for Block B fixed and adaptive gamma comparisons."""
+
+    def __init__(
+        self,
+        scenario: Scenario,
+        method: str,
+        seed: int,
+        gamma: float | None = None,
+        obstacle_enabled: bool = True,
+        prediction_mode: str = "true_velocity",
+        sensor_delay_steps: int = 0,
+        horizon_steps: int | None = None,
+    ) -> None:
+        if ca is None:
+            raise RuntimeError("CasADi is not installed. Install with `python3 -m pip install casadi`.")
+        if method not in {"cbf", "adaptive_cbf"}:
+            raise ValueError("CasADi backend currently supports `cbf` and `adaptive_cbf` in Block B.")
+        if prediction_mode not in {"true_velocity", "static", "stale_velocity"}:
+            raise ValueError(f"Unsupported prediction mode: {prediction_mode}")
+        self.scenario = scenario
+        self.method = method
+        self.seed = seed
+        self.gamma = gamma
+        self.obstacle_enabled = obstacle_enabled
+        self.prediction_mode = prediction_mode
+        self.sensor_delay_steps = sensor_delay_steps
+        self.horizon_steps = min(int(horizon_steps or scenario.simulation.horizon_steps), 10)
+        self._build_solver()
+
+    @property
+    def safe_radius(self) -> float:
+        return self.scenario.robot.radius + self.scenario.obstacle.radius
+
+    def _build_solver(self) -> None:
+        scenario = self.scenario
+        n = self.horizon_steps
+        dt = scenario.simulation.dt
+        self.opti = ca.Opti()
+        self.x = self.opti.variable(4, n + 1)
+        self.u = self.opti.variable(2, n)
+        self.x0 = self.opti.parameter(4)
+        self.obs = self.opti.parameter(2, n + 1)
+        self.gamma_param = self.opti.parameter()
+
+        target = scenario.robot.target
+        self.opti.subject_to(self.x[:, 0] == self.x0)
+        objective = 0
+        for k in range(n):
+            px = self.x[0, k]
+            py = self.x[1, k]
+            vx = self.x[2, k]
+            vy = self.x[3, k]
+            ax = self.u[0, k]
+            ay = self.u[1, k]
+            self.opti.subject_to(self.x[0, k + 1] == px + vx * dt + 0.5 * ax * dt * dt)
+            self.opti.subject_to(self.x[1, k + 1] == py + vy * dt + 0.5 * ay * dt * dt)
+            self.opti.subject_to(self.x[2, k + 1] == vx + ax * dt)
+            self.opti.subject_to(self.x[3, k + 1] == vy + ay * dt)
+            self.opti.subject_to(self.opti.bounded(-scenario.robot.max_accel, ax, scenario.robot.max_accel))
+            self.opti.subject_to(self.opti.bounded(-scenario.robot.max_accel, ay, scenario.robot.max_accel))
+            self.opti.subject_to(self.opti.bounded(-scenario.robot.max_speed, self.x[2, k + 1], scenario.robot.max_speed))
+            self.opti.subject_to(self.opti.bounded(-scenario.robot.max_speed, self.x[3, k + 1], scenario.robot.max_speed))
+
+            objective += 1.0 * ((self.x[0, k + 1] - target[0]) ** 2 + (self.x[1, k + 1] - target[1]) ** 2)
+            objective += 0.03 * (ax**2 + ay**2)
+
+            if self.obstacle_enabled:
+                h_now = self._casadi_h(self.x[0:2, k], self.obs[:, k])
+                h_next = self._casadi_h(self.x[0:2, k + 1], self.obs[:, k + 1])
+                self.opti.subject_to(h_next >= (1.0 - self.gamma_param) * h_now)
+                self.opti.subject_to(h_next >= 0)
+
+        objective += 10.0 * ((self.x[0, n] - target[0]) ** 2 + (self.x[1, n] - target[1]) ** 2)
+        self.opti.minimize(objective)
+        self.opti.solver(
+            "ipopt",
+            {
+                "print_time": False,
+                "ipopt.print_level": 0,
+                "ipopt.max_iter": 80,
+                "ipopt.sb": "yes",
+                "ipopt.acceptable_tol": 1e-5,
+            },
+        )
+
+    def _casadi_h(self, position, obstacle):
+        dx = position[0] - obstacle[0]
+        dy = position[1] - obstacle[1]
+        return dx * dx + dy * dy - self.safe_radius * self.safe_radius
+
+    def solve(self, state: np.ndarray, step: int) -> ControlResult:
+        start = time.perf_counter()
+        gamma_used = self._effective_gamma(state, step)
+        try:
+            obs = np.stack([self._predicted_obstacle_position(step, k) for k in range(self.horizon_steps + 1)], axis=1)
+            self.opti.set_value(self.x0, state)
+            self.opti.set_value(self.obs, obs)
+            self.opti.set_value(self.gamma_param, gamma_used)
+            nominal = nominal_pd_control(state, self.scenario)
+            self.opti.set_initial(self.u, np.tile(nominal.reshape(2, 1), (1, self.horizon_steps)))
+            self.opti.set_initial(self.x, np.tile(state.reshape(4, 1), (1, self.horizon_steps + 1)))
+            sol = self.opti.solve()
+            control = np.array(sol.value(self.u[:, 0]), dtype=float).reshape(2)
+            success = True
+            fallback_used = False
+            infeasible = False
+            status = str(self.opti.return_status())
+            violation = 0.0
+        except Exception as exc:
+            control = nominal_pd_control(state, self.scenario)
+            success = False
+            fallback_used = True
+            try:
+                status = str(self.opti.return_status())
+            except Exception:
+                status = type(exc).__name__
+            exc_text = f"{status} {type(exc).__name__} {exc}".lower()
+            infeasible = "infeasible" in exc_text or "restoration_failed" in exc_text
+            violation = 1.0
+
+        solve_time_ms = (time.perf_counter() - start) * 1000.0
+        return ControlResult(
+            control=clip_norm(control[None, :], self.scenario.robot.max_accel)[0],
+            solve_time_ms=solve_time_ms,
+            solver_success=success,
+            predicted_violation=violation,
+            gamma_used=gamma_used,
+            backend="casadi_ipopt",
+            infeasible=infeasible,
+            fallback_used=fallback_used,
+            solver_status=status,
+        )
+
+    def _effective_gamma(self, state: np.ndarray, step: int) -> float:
+        if self.method == "adaptive_cbf":
+            return self._rule_based_gamma(state, step)
+        return 0.15 if self.gamma is None else float(self.gamma)
 
     def _rule_based_gamma(self, state: np.ndarray, step: int) -> float:
         pos = state[:2]

@@ -34,10 +34,34 @@ def plot_trajectory(
     ax.scatter([scenario.robot.target[0]], [scenario.robot.target[1]], marker="*", c="tab:orange", s=130, label="target")
     ax.set_xlabel("x")
     ax.set_ylabel("y")
-    ax.set_title("Block A trajectory comparison")
+    ax.set_title("Block B trajectory comparison")
     ax.axis("equal")
     ax.grid(True, alpha=0.25)
     ax.legend(loc="best", fontsize=8)
+    fig.tight_layout()
+    fig.savefig(path, dpi=180)
+    plt.close(fig)
+
+
+def plot_metric_boxplot(
+    path: str | Path,
+    grouped_values: dict[str, list[float]],
+    ylabel: str,
+    title: str,
+) -> None:
+    labels = [label for label, values in grouped_values.items() if values]
+    if not labels:
+        return
+
+    values = [grouped_values[label] for label in labels]
+    fig, ax = plt.subplots(figsize=(7, 4.2))
+    ax.boxplot(values, tick_labels=labels, showmeans=True)
+    ax.set_ylabel(ylabel)
+    ax.set_title(title)
+    ax.grid(True, axis="y", alpha=0.25)
+    for tick in ax.get_xticklabels():
+        tick.set_rotation(15)
+        tick.set_ha("right")
     fig.tight_layout()
     fig.savefig(path, dpi=180)
     plt.close(fig)

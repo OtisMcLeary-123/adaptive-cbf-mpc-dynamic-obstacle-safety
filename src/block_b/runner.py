@@ -5,10 +5,11 @@ from typing import Any
 
 import numpy as np
 
-from .controllers import SamplingMPCController
+from .artifacts import write_standard_artifacts
+from .controllers import CasadiMPCController, SamplingMPCController
 from .dynamics import step_state
 from .io import ensure_dir, write_json, write_trace_csv
-from .metrics import aggregate_runs, summarize_trace
+from .metrics import aggregate_runs_with_ci, summarize_trace
 from .plots import plot_distance, plot_trajectory
 from .scenario import Scenario, load_scenario, obstacle_position, scenario_for_seed
 
@@ -21,18 +22,34 @@ def simulate_run(
     obstacle_enabled: bool = True,
     prediction_mode: str = "true_velocity",
     sensor_delay_steps: int = 0,
+    backend: str = "random_shooting",
+    casadi_horizon: int | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     run_scenario = scenario_for_seed(scenario, seed)
     state = run_scenario.robot.start.copy()
-    controller = SamplingMPCController(
-        run_scenario,
-        method=method,
-        seed=seed,
-        gamma=gamma,
-        obstacle_enabled=obstacle_enabled,
-        prediction_mode=prediction_mode,
-        sensor_delay_steps=sensor_delay_steps,
-    )
+    if backend == "casadi":
+        controller = CasadiMPCController(
+            run_scenario,
+            method=method,
+            seed=seed,
+            gamma=gamma,
+            obstacle_enabled=obstacle_enabled,
+            prediction_mode=prediction_mode,
+            sensor_delay_steps=sensor_delay_steps,
+            horizon_steps=casadi_horizon,
+        )
+    elif backend == "random_shooting":
+        controller = SamplingMPCController(
+            run_scenario,
+            method=method,
+            seed=seed,
+            gamma=gamma,
+            obstacle_enabled=obstacle_enabled,
+            prediction_mode=prediction_mode,
+            sensor_delay_steps=sensor_delay_steps,
+        )
+    else:
+        raise ValueError(f"Unsupported backend: {backend}")
     rows: list[dict[str, Any]] = []
     safe_radius = run_scenario.robot.radius + run_scenario.obstacle.radius
 
@@ -48,6 +65,8 @@ def simulate_run(
             {
                 "seed": seed,
                 "method": method,
+                "scenario_id": run_scenario.scenario_id,
+                "backend": result.backend,
                 "gamma": "" if gamma is None else gamma,
                 "gamma_used": "" if result.gamma_used is None else result.gamma_used,
                 "prediction_mode": prediction_mode,
@@ -68,6 +87,9 @@ def simulate_run(
                 "target_error": target_error,
                 "solve_time_ms": result.solve_time_ms,
                 "solver_success": result.solver_success,
+                "infeasible": result.infeasible,
+                "fallback_used": result.fallback_used,
+                "solver_status": result.solver_status,
                 "predicted_violation": result.predicted_violation,
                 "reached_target": reached,
             }
@@ -85,7 +107,8 @@ def simulate_run(
             "sensor_delay_steps": sensor_delay_steps,
             "scenario_id": run_scenario.scenario_id,
             "obstacle_enabled": obstacle_enabled,
-            "solver": "numpy_random_shooting_mpc",
+            "solver": _solver_name(backend),
+            "backend": backend,
         }
     )
     return rows, summary
@@ -101,6 +124,8 @@ def run_experiment(
     obstacle_enabled: bool = True,
     prediction_mode: str = "true_velocity",
     sensor_delay_steps: int = 0,
+    backend: str = "random_shooting",
+    casadi_horizon: int | None = None,
 ) -> dict[str, Any]:
     scenario = load_scenario(scenario_path)
     out = ensure_dir(output_dir)
@@ -117,13 +142,15 @@ def run_experiment(
             obstacle_enabled=obstacle_enabled,
             prediction_mode=prediction_mode,
             sensor_delay_steps=sensor_delay_steps,
+            backend=backend,
+            casadi_horizon=casadi_horizon,
         )
         all_rows.extend(rows)
         run_summaries.append(summary)
         if seed == 0:
             representative = rows
 
-    aggregate = aggregate_runs(run_summaries)
+    aggregate = aggregate_runs_with_ci(run_summaries)
     summary_doc = {
         "experiment_id": experiment_id,
         "method": method,
@@ -131,7 +158,8 @@ def run_experiment(
         "prediction_mode": prediction_mode,
         "sensor_delay_steps": sensor_delay_steps,
         "scenario_id": scenario.scenario_id,
-        "solver": "numpy_random_shooting_mpc",
+        "solver": _solver_name(backend),
+        "backend": backend,
         "references": _references_for(method),
         "aggregate": aggregate,
         "runs": run_summaries,
@@ -142,6 +170,7 @@ def run_experiment(
         label = method if gamma is None else f"{method} gamma={gamma}"
         plot_trajectory(out / "trajectory.png", scenario, {label: representative})
         plot_distance(out / "distance_to_obstacle.png", {label: representative})
+    write_standard_artifacts(out, scenario, scenario_path, summary_doc, all_rows)
     return summary_doc
 
 
@@ -151,6 +180,8 @@ def run_e5_prediction_comparison(
     seeds: int,
     gamma: float = 0.08,
     sensor_delay_steps: int = 3,
+    backend: str = "random_shooting",
+    casadi_horizon: int | None = None,
 ) -> dict[str, Any]:
     out = ensure_dir(output_dir)
     scenario = load_scenario(scenario_path)
@@ -173,6 +204,8 @@ def run_e5_prediction_comparison(
                 gamma=gamma,
                 prediction_mode=prediction_mode,
                 sensor_delay_steps=delay,
+                backend=backend,
+                casadi_horizon=casadi_horizon,
             )
             all_rows.extend(rows)
             run_summaries.append(summary)
@@ -182,7 +215,7 @@ def run_e5_prediction_comparison(
             "prediction_mode": prediction_mode,
             "sensor_delay_steps": delay,
             "gamma": gamma,
-            "aggregate": aggregate_runs(run_summaries),
+            "aggregate": aggregate_runs_with_ci(run_summaries),
             "runs": run_summaries,
         }
 
@@ -190,7 +223,8 @@ def run_e5_prediction_comparison(
         "experiment_id": "E5",
         "method": "dynamic_obstacle_prediction_comparison",
         "scenario_id": scenario.scenario_id,
-        "solver": "numpy_random_shooting_mpc",
+        "solver": _solver_name(backend),
+        "backend": backend,
         "references": _references_for("cbf"),
         "comparison_gamma": gamma,
         "results": results,
@@ -199,6 +233,7 @@ def run_e5_prediction_comparison(
     write_json(out / "summary.json", summary_doc)
     plot_trajectory(out / "trajectory.png", scenario, representative_traces)
     plot_distance(out / "distance_to_obstacle.png", representative_traces)
+    write_standard_artifacts(out, scenario, scenario_path, summary_doc, all_rows)
     return summary_doc
 
 
@@ -206,7 +241,9 @@ def run_e6_adaptive_gamma(
     scenario_path: str | Path,
     output_dir: str | Path,
     seeds: int,
-    fixed_gamma: float = 0.15,
+    fixed_gammas: list[float] | None = None,
+    backend: str = "random_shooting",
+    casadi_horizon: int | None = None,
 ) -> dict[str, Any]:
     out = ensure_dir(output_dir)
     scenario = load_scenario(scenario_path)
@@ -214,32 +251,42 @@ def run_e6_adaptive_gamma(
     results = {}
     representative_traces: dict[str, list[dict[str, Any]]] = {}
 
-    for method, method_gamma, label in [
-        ("cbf", fixed_gamma, f"Fixed CBF gamma={fixed_gamma}"),
-        ("adaptive_cbf", None, "Rule adaptive CBF"),
-    ]:
+    gammas = fixed_gammas or [0.15, 0.08, 0.04]
+    cases = [("cbf", gamma, f"Fixed CBF gamma={gamma}") for gamma in gammas]
+    cases.append(("adaptive_cbf", None, "Rule adaptive CBF"))
+
+    for method, method_gamma, label in cases:
         run_summaries = []
         for seed in range(seeds):
-            rows, summary = simulate_run(scenario, method=method, seed=seed, gamma=method_gamma)
+            rows, summary = simulate_run(
+                scenario,
+                method=method,
+                seed=seed,
+                gamma=method_gamma,
+                backend=backend,
+                casadi_horizon=casadi_horizon,
+            )
             all_rows.extend(rows)
             run_summaries.append(summary)
             if seed == 0:
                 representative_traces[label] = rows
-        results[label] = {"aggregate": aggregate_runs(run_summaries), "runs": run_summaries}
+        results[label] = {"aggregate": aggregate_runs_with_ci(run_summaries), "runs": run_summaries}
 
     summary_doc = {
         "experiment_id": "E6",
         "method": "fixed_vs_rule_adaptive_gamma",
         "scenario_id": scenario.scenario_id,
-        "solver": "numpy_random_shooting_mpc",
+        "solver": _solver_name(backend),
+        "backend": backend,
         "references": ["[5]", "[9]", "[10]", "[11]"],
-        "fixed_gamma": fixed_gamma,
+        "fixed_gammas": gammas,
         "results": results,
     }
     write_trace_csv(out / "trace.csv", all_rows)
     write_json(out / "summary.json", summary_doc)
     plot_trajectory(out / "trajectory.png", scenario, representative_traces)
     plot_distance(out / "distance_to_obstacle.png", representative_traces)
+    write_standard_artifacts(out, scenario, scenario_path, summary_doc, all_rows)
     return summary_doc
 
 
@@ -251,3 +298,9 @@ def _references_for(method: str) -> list[str]:
     if method in {"cbf", "adaptive_cbf"}:
         return ["[5]", "[9]", "[10]", "[11]"]
     return ["[5]", "[9]", "[10]", "[11]"]
+
+
+def _solver_name(backend: str) -> str:
+    if backend == "casadi":
+        return "casadi_ipopt"
+    return "numpy_random_shooting_mpc"

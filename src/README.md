@@ -5,17 +5,25 @@ This directory contains the shared Block B implementation.
 Modules:
 
 ```text
-dynamics.py
-scenario.py
-metrics.py
+artifacts.py
 controllers.py
-runner.py
+dynamics.py
+metrics.py
 plots.py
+runner.py
+scenario.py
 ```
 
-The current v1 implementation uses a deterministic NumPy random-shooting MPC controller for reproducible micro-experiments.
+The implementation supports two MPC backends:
+
+| Backend | Implementation | Notes |
+|---|---|---|
+| `random_shooting` | deterministic NumPy random-shooting MPC | Fast backend for 50-seed sweeps. |
+| `casadi` | CasADi/IPOPT nonlinear program | Solver comparison backend synced from Block A. |
 
 Block B extends the Block A controller with:
 
 - obstacle prediction modes: `static`, `stale_velocity`, `true_velocity`
 - rule-based adaptive CBF gamma from clearance and time-to-collision
+- standardized artifacts: `config.yaml`, `metrics_summary.csv`, `per_seed_metrics.csv`, trajectory CSVs, figures, logs, and per-run report
+- explicit separation of solver failure, infeasibility, fallback, control failure, and collision metrics
